@@ -47,7 +47,6 @@ class Util:
             elif cspace == 'YCrCb':
                 feature_image = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
 
-            # Call self.get_hog_features() with vis=False, feature_vec=True
             if hog_channel == 'ALL':
                 hog_features = []
                 for channel in range(feature_image.shape[2]):
@@ -58,9 +57,7 @@ class Util:
             else:
                 hog_features = self.get_hog_features(feature_image[:, :, hog_channel], orient,
                                                      pix_per_cell, cell_per_block, vis=False, feature_vec=True)
-            # Append the new feature vector to the features list
             features.append(hog_features)
-        # Return list of feature vectors
         return features
 
     def single_img_features(self, img, color_space='RGB', orient=9, pix_per_cell=8, cell_per_block=2, hog_channel=2,
@@ -68,7 +65,6 @@ class Util:
 
         img_features = []
 
-        # 2) Apply color conversion if other than 'RGB'
         if color_space == 'RGB':
             feature_image = np.copy(img)
         elif color_space == 'HSV':
@@ -81,8 +77,9 @@ class Util:
             feature_image = cv2.cvtColor(img, cv2.COLOR_RGB2YUV)
         elif color_space == 'YCrCb':
             feature_image = cv2.cvtColor(img, cv2.COLOR_RGB2YCrCb)
+        else:
+            return -1
 
-        # 3) Compute HOG features if flag is set
         if hog_f:
             if hog_channel == 'ALL':
                 hog_features = []
@@ -96,5 +93,4 @@ class Util:
 
             img_features.append(hog_features)
 
-        # 9) Return concatenated array of features
         return np.concatenate(img_features)

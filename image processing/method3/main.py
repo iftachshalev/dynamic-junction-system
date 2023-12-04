@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 import util
 import cv2
 import numpy as np
+import joblib
 
 
 class Ai:
@@ -73,7 +74,7 @@ class Ai:
 
         plt.show()
 
-    def train_svm(self):
+    def setup_for_training(self):
         t1 = time.time()
         vehicle_hog_features = self.UTIL.extract_features(self.vehicle_image_filenames, self.color_space, self.orient,
                                                           self.pix_per_cell, self.cell_per_block, self.hog_channel)
@@ -84,41 +85,47 @@ class Ai:
         t2 = time.time()
         print(round(t2 - t1, 2), 'Seconds to extract HOG features...')
 
-        # Create an array stack of feature vectors
-        X = np.vstack((vehicle_hog_features, non_vehicle_hog_features)).astype(np.float64)
-        # Fit a per-column scaler
-        X_scaler = StandardScaler().fit(X)
-        # Apply the scaler to X
-        scaled_X = X_scaler.transform(X)
-        # Define the labels vector
+        x = np.vstack((vehicle_hog_features, non_vehicle_hog_features)).astype(np.float64)
+        x_scaler = StandardScaler().fit(x)
+        scaled_x = x_scaler.transform(x)
         y = np.hstack((np.ones(len(vehicle_hog_features)), np.zeros(len(non_vehicle_hog_features))))
-        # Split up data into randomized training and test sets
         rand_state = np.random.randint(0, 100)
-        X_train, X_test, y_train, y_test = train_test_split(scaled_X, y, test_size=0.2, random_state=rand_state)
+        return train_test_split(scaled_x, y, test_size=0.2, random_state=rand_state)
 
+    def train_svm(self):
+        x_train, x_test, y_train, y_test = self.setup_for_training()
         print('Using:', self.orient, 'orientations', self.pix_per_cell, 'pixels per cell and', self.cell_per_block,
               'cells per block')
-        print('Training data set size: ', len(X_train))
-        print('Testing data set size: ', len(X_test))
+        print('Training data set size: ', len(x_train))
+        print('Testing data set size: ', len(x_test))
 
         # Use a linear SVC
         svc = LinearSVC(dual="auto")
 
         # Check the training time for the SVC
         t = time.time()
-        svc.fit(X_train, y_train)
+        svc.fit(x_train, y_train)
         t2 = time.time()
 
         print(round(t2 - t, 2), 'Seconds to train SVC...')
 
         # Check the score of the SVC
-        print('Test Accuracy of SVC = ', round(svc.score(X_test, y_test), 4))
+        print('Test Accuracy of SVC = ', round(svc.score(x_test, y_test), 4))
+
+        # Save the trained model to a file
+        model_filename = 'svm_model.joblib'
+        joblib.dump(svc, model_filename)
+        print(f"Trained model saved to {model_filename}")
+
+    def predict(self, n_predict):
+        x_train, x_test, y_train, y_test = self.setup_for_training()
+        model_filename = 'svm_model.joblib'
+        svc = joblib.load(model_filename)
 
         # Check the prediction time for a single sample
         t = time.time()
-        n_predict = 10
 
-        print('My SVC predicts: ', svc.predict(X_test[0:n_predict]))
+        print('My SVC predicts: ', svc.predict(x_test[0:n_predict]))
         print('For these', n_predict, 'labels: ', y_test[0:n_predict])
 
         t2 = time.time()
@@ -129,4 +136,5 @@ class Ai:
 ai = Ai(8, 2, 9, "YCrCb", "ALL")
 ai.show_plt_ex(10, 10)
 ai.show_hog_ex(10, 10)
-ai.train_svm()
+# ai.train_svm()
+ai.predict(20)
