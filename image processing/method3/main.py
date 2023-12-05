@@ -8,6 +8,7 @@ import util
 import cv2
 import numpy as np
 import joblib
+import matplotlib.image as mpimg
 
 
 class Ai:
@@ -15,15 +16,15 @@ class Ai:
     VEHICLE_PATH = "data/vehicles/**/*.png"
     NON_VEHICLE_PATH = "data/non-vehicles/**/*.png"
     UTIL = util.Util()
+    X_SCALER_FILE = "x_scaler.joblib"
+    SVC_FILE = 'svm_model.joblib'
 
-    def __init__(self, pix_per_cell, cell_per_block, orient, color_space, hog_channel):
+    def __init__(self, color_space='RGB', orient=9, pix_per_cell=8, cell_per_block=2, hog_channel=2, train=False):
         self.vehicle_image_filenames = glob.glob(self.VEHICLE_PATH, recursive=True)
         self.non_vehicle_image_filenames = glob.glob(self.NON_VEHICLE_PATH, recursive=True)
-        self.pix_per_cell = pix_per_cell
-        self.cell_per_block = cell_per_block
-        self.orient = orient
-        self.color_space = color_space
-        self.hog_channel = hog_channel
+        self.UTIL = util.Util(color_space, orient, pix_per_cell, cell_per_block, hog_channel)
+        if train:
+            self.train_svm()
 
     def show_plt_ex(self, vehicle_idx, non_vehicle_idx):
         if len(self.vehicle_image_filenames) <= vehicle_idx:
@@ -76,12 +77,9 @@ class Ai:
 
     def setup_for_training(self):
         t1 = time.time()
-        vehicle_hog_features = self.UTIL.extract_features(self.vehicle_image_filenames, self.color_space, self.orient,
-                                                          self.pix_per_cell, self.cell_per_block, self.hog_channel)
+        vehicle_hog_features = self.UTIL.extract_features(self.vehicle_image_filenames)
 
-        non_vehicle_hog_features = self.UTIL.extract_features(self.non_vehicle_image_filenames,
-                                                              self.color_space, self.orient, self.pix_per_cell,
-                                                              self.cell_per_block, self.hog_channel)
+        non_vehicle_hog_features = self.UTIL.extract_features(self.non_vehicle_image_filenames)
         t2 = time.time()
         print(round(t2 - t1, 2), 'Seconds to extract HOG features...')
 
@@ -90,12 +88,11 @@ class Ai:
         scaled_x = x_scaler.transform(x)
         y = np.hstack((np.ones(len(vehicle_hog_features)), np.zeros(len(non_vehicle_hog_features))))
         rand_state = np.random.randint(0, 100)
+        joblib.dump(x_scaler, self.X_SCALER_FILE)
         return train_test_split(scaled_x, y, test_size=0.2, random_state=rand_state)
 
     def train_svm(self):
         x_train, x_test, y_train, y_test = self.setup_for_training()
-        print('Using:', self.orient, 'orientations', self.pix_per_cell, 'pixels per cell and', self.cell_per_block,
-              'cells per block')
         print('Training data set size: ', len(x_train))
         print('Testing data set size: ', len(x_test))
 
@@ -113,28 +110,19 @@ class Ai:
         print('Test Accuracy of SVC = ', round(svc.score(x_test, y_test), 4))
 
         # Save the trained model to a file
-        model_filename = 'svm_model.joblib'
-        joblib.dump(svc, model_filename)
-        print(f"Trained model saved to {model_filename}")
+        joblib.dump(svc, self.SVC_FILE)
+        print(f"Trained model saved to {self.SVC_FILE}")
 
-    def predict(self, n_predict):
-        x_train, x_test, y_train, y_test = self.setup_for_training()
-        model_filename = 'svm_model.joblib'
-        svc = joblib.load(model_filename)
-
-        # Check the prediction time for a single sample
-        t = time.time()
-
-        print('My SVC predicts: ', svc.predict(x_test[0:n_predict]))
-        print('For these', n_predict, 'labels: ', y_test[0:n_predict])
-
-        t2 = time.time()
-
-        print(round(t2 - t, 5), 'Seconds to predict', n_predict, 'labels with SVC')
+    def img_check(self, img_path):
+        is_vi = self.UTIL.single_img_features(img_path)
+        x_scaler = joblib.load(self.X_SCALER_FILE)
+        svc = joblib.load(self.SVC_FILE)
+        scaled_features = x_scaler.transform(np.array(is_vi).reshape(1, -1))
+        prediction = svc.predict(scaled_features)
+        print(f"prediction: {prediction}")
 
 
-ai = Ai(8, 2, 9, "YCrCb", "ALL")
-ai.show_plt_ex(10, 10)
-ai.show_hog_ex(10, 10)
-# ai.train_svm()
-ai.predict(20)
+ai = Ai(train=True)
+# ai.show_plt_ex(10, 10)
+# ai.show_hog_ex(10, 10)
+ai.img_check("image0000.png")
