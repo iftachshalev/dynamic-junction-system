@@ -11,6 +11,9 @@ import joblib
 import matplotlib.image as mpimg
 
 
+# default - color_space='RGB', orient=9, pix_per_cell=8, cell_per_block=2, hog_channel=2, train=False
+
+
 class Ai:
 
     VEHICLE_PATH = "data/vehicles/**/*.png"
@@ -18,7 +21,7 @@ class Ai:
     X_SCALER_FILE = "x_scaler.joblib"
     SVC_FILE = 'svm_model.joblib'
 
-    def __init__(self, color_space='RGB', orient=9, pix_per_cell=8, cell_per_block=2, hog_channel=2, train=False):
+    def __init__(self, color_space='RGB', orient=111, pix_per_cell=8, cell_per_block=2, hog_channel=2, train=False):
         self.vehicle_image_filenames = glob.glob(self.VEHICLE_PATH, recursive=True)
         self.non_vehicle_image_filenames = glob.glob(self.NON_VEHICLE_PATH, recursive=True)
         self.UTIL = util.Util(color_space, orient, pix_per_cell, cell_per_block, hog_channel)
@@ -68,22 +71,6 @@ class Ai:
 
         plt.show()
 
-    def setup_for_training(self):
-        t1 = time.time()
-        vehicle_hog_features = self.UTIL.extract_features(self.vehicle_image_filenames)
-
-        non_vehicle_hog_features = self.UTIL.extract_features(self.non_vehicle_image_filenames)
-        t2 = time.time()
-        print(round(t2 - t1, 2), 'Seconds to extract HOG features...')
-
-        x = np.vstack((vehicle_hog_features, non_vehicle_hog_features)).astype(np.float64)
-        x_scaler = StandardScaler().fit(x)
-        scaled_x = x_scaler.transform(x)
-        y = np.hstack((np.ones(len(vehicle_hog_features)), np.zeros(len(non_vehicle_hog_features))))
-        rand_state = np.random.randint(0, 100)
-        joblib.dump(x_scaler, self.X_SCALER_FILE)
-        return train_test_split(scaled_x, y, test_size=0.2, random_state=rand_state)
-
     def train_svm(self):
         x_train, x_test, y_train, y_test = self.UTIL.setup_for_training(self.vehicle_image_filenames,
                                                                         self.non_vehicle_image_filenames,
@@ -117,6 +104,7 @@ class Ai:
         print(f"prediction: {prediction[0]}")
 
     def predict(self, img_path):
+        t = time.time()
         # Read the image
         image = mpimg.imread(img_path)
 
@@ -134,7 +122,9 @@ class Ai:
         scaled_features = x_scaler.transform(np.array(hog_features).reshape(1, -1))
         prediction = svc.predict(scaled_features)
         print(f"Prediction: {prediction[0]}")
+        t2 = time.time()
+        print(f"time: {round(t2 - t, 2)}")
 
 
-ai = Ai()
-ai.predict("c.png")
+ai = Ai(train=True)
+ai.predict("test_images/c.png")
