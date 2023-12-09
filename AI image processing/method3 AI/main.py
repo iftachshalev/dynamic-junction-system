@@ -2,8 +2,6 @@ import glob
 import matplotlib.pyplot as plt
 import time
 from sklearn.svm import LinearSVC
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
 import util
 import cv2
 import numpy as np
@@ -21,12 +19,17 @@ class Ai:
     X_SCALER_FILE = "x_scaler.joblib"
     SVC_FILE = 'svm_model.joblib'
 
-    def __init__(self, color_space='RGB', orient=111, pix_per_cell=8, cell_per_block=2, hog_channel=2, train=False):
+    def __init__(self, color_space='RGB', orient=11, pix_per_cell=8, cell_per_block=2, hog_channel=2, train=False):
         self.vehicle_image_filenames = glob.glob(self.VEHICLE_PATH, recursive=True)
         self.non_vehicle_image_filenames = glob.glob(self.NON_VEHICLE_PATH, recursive=True)
         self.UTIL = util.Util(color_space, orient, pix_per_cell, cell_per_block, hog_channel)
         if train:
+            self.x_scaler = None
+            self.svc = None
             self.train_svm()
+        else:
+            self.x_scaler = joblib.load(self.X_SCALER_FILE)
+            self.svc = joblib.load(self.SVC_FILE)
 
     def show_plt_ex(self, vehicle_idx, non_vehicle_idx):
         if len(self.vehicle_image_filenames) <= vehicle_idx:
@@ -72,36 +75,28 @@ class Ai:
         plt.show()
 
     def train_svm(self):
-        x_train, x_test, y_train, y_test = self.UTIL.setup_for_training(self.vehicle_image_filenames,
-                                                                        self.non_vehicle_image_filenames,
-                                                                        self.X_SCALER_FILE)
+        x_train, x_test, y_train, y_test, self.x_scaler = self.UTIL.setup_for_training(self.vehicle_image_filenames,
+                                                                                       self.non_vehicle_image_filenames,
+                                                                                       self.X_SCALER_FILE)
         print('Training data set size: ', len(x_train))
         print('Testing data set size: ', len(x_test))
 
         # Use a linear SVC
-        svc = LinearSVC(dual="auto")
+        self.svc = LinearSVC(dual="auto")
 
         # Check the training time for the SVC
         t = time.time()
-        svc.fit(x_train, y_train)
+        self.svc.fit(x_train, y_train)
         t2 = time.time()
 
         print(round(t2 - t, 2), 'Seconds to train SVC...')
 
         # Check the score of the SVC
-        print('Test Accuracy of SVC = ', round(svc.score(x_test, y_test), 4))
+        print('Test Accuracy of SVC = ', round(self.svc.score(x_test, y_test), 4))
 
         # Save the trained model to a file
-        joblib.dump(svc, self.SVC_FILE)
+        joblib.dump(self.svc, self.SVC_FILE)
         print(f"Trained model saved to {self.SVC_FILE}")
-
-    def img_check(self, img_path):
-        hog_features = self.UTIL.single_img_features(img_path)
-        x_scaler = joblib.load(self.X_SCALER_FILE)
-        svc = joblib.load(self.SVC_FILE)
-        scaled_features = x_scaler.transform(np.array(hog_features).reshape(1, -1))
-        prediction = svc.predict(scaled_features)
-        print(f"prediction: {prediction[0]}")
 
     def predict(self, img_path):
         t = time.time()
@@ -114,17 +109,15 @@ class Ai:
         # Extract features from the resized image
         hog_features = self.UTIL.single_img_features(resized_image)
 
-        # Load scaler and classifier
-        x_scaler = joblib.load(self.X_SCALER_FILE)
-        svc = joblib.load(self.SVC_FILE)
-
         # Transform and predict
-        scaled_features = x_scaler.transform(np.array(hog_features).reshape(1, -1))
-        prediction = svc.predict(scaled_features)
+        scaled_features = self.x_scaler.transform(np.array(hog_features).reshape(1, -1))
+        prediction = self.svc.predict(scaled_features)
         print(f"Prediction: {prediction[0]}")
         t2 = time.time()
         print(f"time: {round(t2 - t, 2)}")
 
-
-ai = Ai(train=True)
-ai.predict("test_images/c.png")
+#
+# ai = Ai(train=False)
+# ai.predict("test_images/c.png")
+# ai.predict("test_images/b.png")
+# ai.predict("test_images/a.png")

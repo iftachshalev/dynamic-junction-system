@@ -76,4 +76,5 @@ class Util:
         y = np.hstack((np.ones(len(vehicle_hog_features)), np.zeros(len(non_vehicle_hog_features))))
         rand_state = np.random.randint(0, 100)
         joblib.dump(x_scaler, x_scaler_file)
-        return train_test_split(scaled_x, y, test_size=0.2, random_state=rand_state)
+
+        return *train_test_split(scaled_x, y, test_size=0.2, random_state=rand_state), x_scaler
